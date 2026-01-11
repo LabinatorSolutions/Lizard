@@ -7,34 +7,26 @@ namespace Lizard.Logic.Search.History
     /// Records how successful different moves have been in the past by recording that move's
     /// piece type and color, and the square that it is moving to. 
     /// <br></br>
-    /// This is a short array with dimensions [12][64], with a size of <inheritdoc cref="ByteSize"/>.
+    /// This is a short array with dimensions [12][64], with a size of <inheritdoc cref="Length"/>.
     /// </summary>
-    public unsafe struct PieceToHistory
+    public unsafe readonly struct PieceToHistory
     {
-        private StatEntry* _History;
+        private readonly StatEntry* _History;
 
-        private const short FillValue = -50;
-
-        private const int DimX = PieceNB * 2;
-        private const int DimY = SquareNB;
+        public const short FillValue = -50;
 
         /// <summary>
         /// 12 * 64 == 768 elements
         /// </summary>
-        public const int Length = DimX * DimY;
+        public const int Length = 12 * 64;
 
-        public PieceToHistory() { }
-
-        public void Dispose()
+        public PieceToHistory()
         {
-            NativeMemory.AlignedFree(_History);
+            _History = AlignedAllocZeroed<StatEntry>(Length);
         }
 
-        public StatEntry this[int pc, int pt, int sq]
-        {
-            get => _History[GetIndex(pc, pt, sq)];
-            set => _History[GetIndex(pc, pt, sq)] = value;
-        }
+        public void Clear() => new Span<StatEntry>(_History, Length).Fill(FillValue);
+        public void Dispose() => NativeMemory.AlignedFree(_History);
 
         public StatEntry this[int idx]
         {
@@ -42,34 +34,21 @@ namespace Lizard.Logic.Search.History
             set => _History[idx] = value;
         }
 
+        public StatEntry this[int piece, int sq]
+        {
+            get => _History[GetIndex(piece, sq)];
+            set => _History[GetIndex(piece, sq)] = value;
+        }
+
         /// <summary>
         /// Returns the index of the score in the History array for a piece of color <paramref name="pc"/> 
         /// and type <paramref name="pt"/> moving to the square <paramref name="sq"/>.
         /// </summary>
-        public static int GetIndex(int pc, int pt, int sq)
+        public static int GetIndex(int piece, int sq)
         {
-            Assert((((pt + (PieceNB * pc)) * DimY) + sq) is >= 0 and < (int)Length, $"GetIndex({pc}, {pt}, {sq}) should be < {Length}");
-
-            return ((pt + (PieceNB * pc)) * DimY) + sq;
+            Assert(((piece * 64) + sq) is >= 0 and < (int)Length, $"GetIndex({piece}, {sq}) should be < {Length}");
+            return (piece * 64) + sq;
         }
 
-        /// <summary>
-        /// Allocates memory for this instance's array.
-        /// </summary>
-        public void Alloc()
-        {
-            _History = AlignedAllocZeroed<StatEntry>(Length);
-        }
-
-        /// <summary>
-        /// Fills this instance's array with the value of <see cref="FillValue"/>.
-        /// </summary>
-        public void Clear()
-        {
-            NativeMemory.Clear(_History, (nuint)(sizeof(StatEntry) * Length));
-            Span<StatEntry> span = new Span<StatEntry>(_History, (int)Length);
-            span.Fill(FillValue);
-        }
     }
-
 }

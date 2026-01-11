@@ -1,4 +1,6 @@
+using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics.Arm;
 using System.Runtime.Intrinsics.X86;
 using System.Text;
@@ -10,7 +12,7 @@ namespace Lizard.Logic.Util
 {
     public static class Utilities
     {
-        public const string EngineBuildVersion = "11.2.15";
+        public const string EngineBuildVersion = "11.3.3";
 
         public const int NormalListCapacity = 128;
         public const int MoveListSize = 256;
@@ -170,10 +172,11 @@ namespace Lizard.Logic.Util
         /// <summary>
         /// Returns the opposite of <paramref name="color"/>.
         /// </summary>
-        public static int Not(int color)
-        {
-            return color ^ 1;
-        }
+        public static int Not(int color) => color ^ 1;
+
+        public static int MakePiece(int pc, int pt) => (pc * 6) + pt;
+        public static int ColorOfPiece(int piece) => piece / 6;
+        public static int TypeOfPiece(int piece) => piece % 6;
 
 
         /// <summary>
@@ -721,6 +724,14 @@ namespace Lizard.Logic.Util
             }
         }
 
+        [MethodImpl(Inline)]
+        public static T PopBack<T>(this List<T> list)
+        {
+            T back = list[^1];
+            list.RemoveAt(list.Count - 1);
+            return back;
+        }
+
 
         public static void ParsePositionCommand(string[] input, Position pos, ThreadSetup setup)
         {
@@ -747,6 +758,37 @@ namespace Lizard.Logic.Util
             }
         }
 
+
+        public static unsafe void PrintMemberLayout<T>() where T : struct
+        {
+            List<(string name, int size, int offset)> mems = typeof(T).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                .Select(x =>
+                {
+                    int size = Marshal.SizeOf(x.FieldType);
+                    if (x.FieldType == typeof(bool))
+                        size = 1;
+
+                    return (x.Name, size, (int)Marshal.OffsetOf<T>(x.Name));
+                })
+                .OrderBy(x => x.Item3)
+                .ToList();
+
+            var align = mems.Max(x => x.name.Length) + 2;
+
+            Console.WriteLine($"{typeof(T).Name}: {Marshal.SizeOf<T>()} bytes");
+            for (int i = 0; i < mems.Count; i++)
+            {
+                var (name, size, offset) = mems[i];
+                var next = offset + size;
+                Console.WriteLine($"{name.PadRight(align)}{size,-4} @ {offset}");
+
+                if (i != mems.Count - 1 && mems[i + 1].offset > next)
+                {
+                    int padding = (mems[i + 1].offset - next);
+                    Console.WriteLine($"{"<PAD>".PadRight(align)}{padding,-4} @ {next}");
+                }
+            }
+        }
 
 
         public static unsafe void FillWithScharnaglNumber(int n, int* types)

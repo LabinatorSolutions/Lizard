@@ -5,11 +5,11 @@ namespace Lizard.Logic.Search.History
     /// <summary>
     /// Records the history for a pair of moves.
     /// <br></br>
-    /// This is an array of <see cref="PieceToHistory"/> [12][64], with a size of <inheritdoc cref="ByteSize"/>.
+    /// This is an array of <see cref="PieceToHistory"/> [12][64], with a size of <inheritdoc cref="Length"/>.
     /// </summary>
-    public unsafe struct ContinuationHistory
+    public unsafe readonly struct ContinuationHistory
     {
-        private PieceToHistory* _History;
+        private readonly PieceToHistory* _History;
 
         private const int DimX = PieceNB * 2;
         private const int DimY = SquareNB;
@@ -22,23 +22,19 @@ namespace Lizard.Logic.Search.History
 
         public ContinuationHistory()
         {
-            _History = (PieceToHistory*)AlignedAllocZeroed((nuint)(sizeof(ulong) * Length), AllocAlignment);
-
+            _History = (PieceToHistory*)AlignedAllocZeroed(sizeof(ulong) * Length, AllocAlignment);
+            
             for (nuint i = 0; i < Length; i++)
-            {
-                (_History + i)->Alloc();
-            }
+                _History[i] = new();
         }
 
-        public PieceToHistory* this[int pc, int pt, int sq] => &_History[PieceToHistory.GetIndex(pc, pt, sq)];
         public PieceToHistory* this[int idx] => &_History[idx];
+        public PieceToHistory* this[int piece, int sq] => &_History[PieceToHistory.GetIndex(piece, sq)];
 
         public void Dispose()
         {
             for (nuint i = 0; i < Length; i++)
-            {
-                (_History + i)->Dispose();
-            }
+                _History[i].Dispose();
 
             NativeMemory.AlignedFree(_History);
         }
@@ -46,9 +42,7 @@ namespace Lizard.Logic.Search.History
         public void Clear()
         {
             for (nuint i = 0; i < Length; i++)
-            {
                 _History[i].Clear();
-            }
         }
     }
 }
